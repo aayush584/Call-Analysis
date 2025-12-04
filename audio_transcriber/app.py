@@ -325,6 +325,7 @@ async def process_audio(job_id: str, background_tasks: BackgroundTasks):
 
 def process_audio_task(job_id: str):
     """Background task to process audio"""
+    trans = get_transcriber()
     try:
         file_path = jobs[job_id]["file_path"]
         
@@ -332,7 +333,8 @@ def process_audio_task(job_id: str):
         jobs[job_id]["progress"] = 5
         jobs[job_id]["message"] = "Loading models..."
         
-        trans = get_transcriber()
+        # Models are lazily loaded inside the transcriber; this just ensures the
+        # singleton instance is created.
         
         # Step 2: Diarization
         jobs[job_id]["progress"] = 15
@@ -348,8 +350,11 @@ def process_audio_task(job_id: str):
             jobs[job_id]["progress"] = 30 + int(p * 30)
             jobs[job_id]["message"] = f"Transcribing... {int(p * 100)}%"
         
-        transcript = trans.transcribe_segments(file_path, diarization, 
-            progress_callback=update_transcription_progress)
+        transcript = trans.transcribe_segments(
+            file_path,
+            diarization,
+            progress_callback=update_transcription_progress
+        )
         
         # Step 4: Summarization
         jobs[job_id]["progress"] = 65
@@ -395,6 +400,11 @@ def process_audio_task(job_id: str):
         import traceback
         traceback.print_exc()
         print(f"Error processing {job_id}: {e}")
+    finally:
+        # After each job, aggressively clear inference-time memory while keeping
+        # the heavy models (ASR, diarization, LLM backend) resident.
+        if hasattr(trans, "_clear_inference_memory"):
+            trans._clear_inference_memory()
 
 
 @app.get("/status/{job_id}")

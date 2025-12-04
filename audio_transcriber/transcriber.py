@@ -1,5 +1,6 @@
 import os
 import sys
+import gc
 from pathlib import Path
 
 import torch
@@ -96,9 +97,9 @@ class AudioTranscriber:
             segment['end'] = float(segment['end'])
         
         return merged_segments
-        
-    def transcribe_segment(self, audio_path, start, end):
-        waveform, sr = torchaudio.load(audio_path)
+    
+    def _transcribe_segment_from_waveform(self, waveform, sr, start, end):
+        """Internal helper that works on a pre-loaded waveform to avoid re-loading audio."""
         segment = waveform[:, int(start * sr): int(end * sr)]
         
         if sr != 16000:
@@ -125,30 +126,51 @@ class AudioTranscriber:
             skip_special_tokens=True
         )[0]
         return text
+    
+    def transcribe_segment(self, audio_path, start, end):
+        """
+        Public API kept for backwards compatibility.
+        For efficiency, prefer using `transcribe_segments` which loads the audio only once.
+        """
+        waveform, sr = torchaudio.load(audio_path)
+        try:
+            return self._transcribe_segment_from_waveform(waveform, sr, start, end)
+        finally:
+            # Explicitly release large tensors
+            del waveform
+            self._clear_inference_memory()
         
     def transcribe_segments(self, audio_path, diarization_segments, progress_callback=None):
         results = []
         total = len(diarization_segments)
         
-        for i, segment in enumerate(diarization_segments):
-            start = segment['start']
-            end = segment['end']
-            speaker = segment['speaker']
-            
-            text = self.transcribe_segment(audio_path, start, end)
-            
-            results.append({
-                "speaker": speaker,
-                "start": round(start, 2),
-                "end": round(end, 2),
-                "text": text
-            })
-            
-            if progress_callback:
-                progress_callback((i + 1) / total)
+        # Load the audio once per job to avoid repeated I/O and fragmented memory
+        waveform, sr = torchaudio.load(audio_path)
+        
+        try:
+            for i, segment in enumerate(diarization_segments):
+                start = segment['start']
+                end = segment['end']
+                speaker = segment['speaker']
                 
-            print(f"[{start:.2f} - {end:.2f}] {speaker}: {text}")
-            
+                text = self._transcribe_segment_from_waveform(waveform, sr, start, end)
+                
+                results.append({
+                    "speaker": speaker,
+                    "start": round(start, 2),
+                    "end": round(end, 2),
+                    "text": text
+                })
+                
+                if progress_callback:
+                    progress_callback((i + 1) / total)
+                    
+                print(f"[{start:.2f} - {end:.2f}] {speaker}: {text}")
+        finally:
+            # Release waveform and aggressively clear inference-time memory
+            del waveform
+            self._clear_inference_memory()
+        
         return results
         
     def summarize(self, transcript_data):
@@ -178,6 +200,21 @@ Be concise and professional."""),
         summary = chain.invoke({"transcript": conversation})
         
         return summary, conversation
+        
+    def _clear_inference_memory(self):
+        """
+        Clear temporary tensors and let the runtime reclaim as much memory as possible,
+        while keeping the models themselves loaded.
+        """
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            try:
+                torch.mps.empty_cache()
+            except Exception:
+                # Some PyTorch versions may not expose empty_cache for MPS
+                pass
         
     def get_speaker_stats(self, transcript):
         stats = defaultdict(lambda: {"segments": 0, "duration": 0, "words": 0})

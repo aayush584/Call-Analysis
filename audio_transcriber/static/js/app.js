@@ -634,7 +634,11 @@ function showResults(result) {
     speakerStats.innerHTML = result.speaker_stats.map((stat, index) => `
         <div class="speaker-stat-item">
             <div class="speaker-name">
-                <div class="speaker-avatar speaker-${index % 3}">${stat.speaker.replace('SPEAKER_', 'S')}</div>
+                <div class="speaker-avatar speaker-${index % 3}">
+                    ${String(stat.speaker || '')
+                        .replace(/speaker_/i, 'S')
+                        .replace(/^\s+|\s+$/g, '')}
+                </div>
                 <span>${stat.speaker}</span>
             </div>
             <div class="speaker-stats-grid">
@@ -669,9 +673,21 @@ function showResults(result) {
     showToast('Processing complete!', 'success');
 }
 
+function deleteJobData() {
+    console.log('Deleting job data for job ID:', currentJobId);
+    (async () => {
+        if (!currentJobId) return;
+        try {
+            await fetch(`/job/${currentJobId}`, { method: 'DELETE' });
+            console.log('Job data deleted from server for job ID:', currentJobId);
+        } catch (err) {
+            console.warn('Failed to delete job data from server:', err);
+        }
+    })();
+}
+
 function updateTranscriptAudio(audioUrl, filename) {
     if (!transcriptAudioContainer) return;
-
     if (audioUrl && transcriptAudioPlayer) {
         transcriptAudioContainer.classList.remove('hidden');
         transcriptAudioPlayer.src = `${audioUrl}?v=${Date.now()}`;
@@ -926,6 +942,13 @@ function downloadOriginalAudio() {
 
 function resetApp() {
     stopPolling();
+    // Now that the user is done with this job/session, clear server-side
+    // data (job record + uploaded audio). This avoids deleting the file
+    // while the audio is still streaming, which was causing incomplete
+    // playback.
+    if (currentJobId) {
+        deleteJobData();
+    }
     currentJobId = null;
     resultData = null;
     allExpanded = false;
