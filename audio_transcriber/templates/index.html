@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Transcription & Summarization</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <i class="fas fa-headphones"></i>
+                <h1>Audio Transcriber</h1>
+            </div>
+            <p class="tagline">AI-Powered Transcription, Summarization & Quality Analysis</p>
+            
+            <!-- Settings Button -->
+            <button class="btn btn-settings" onclick="openQuestionsModal()">
+                <i class="fas fa-cog"></i> Manage Questions
+            </button>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Upload Section -->
+            <section class="upload-section" id="uploadSection">
+                <div class="upload-area" id="dropZone">
+                    <div class="upload-icon">
+                        <i class="fas fa-cloud-arrow-up"></i>
+                    </div>
+                    <h2>Upload Audio File</h2>
+                    <p>Drag & drop your audio file here or click to browse</p>
+                    <p class="supported-formats">Supported: WAV, MP3, M4A, FLAC, OGG, WebM</p>
+                    <input type="file" id="fileInput" accept=".wav,.mp3,.m4a,.flac,.ogg,.webm" hidden>
+                    <button class="btn btn-primary" id="browseBtn">
+                        <i class="fas fa-folder-open"></i> Browse Files
+                    </button>
+                </div>
+                
+                <!-- Questions Summary -->
+                <div class="questions-summary" id="questionsSummary">
+                    <div class="summary-header">
+                        <i class="fas fa-clipboard-check"></i>
+                        <span>Quality Checklist: <strong id="enabledCount">0</strong> questions enabled</span>
+                    </div>
+                    <button class="btn btn-sm btn-secondary" onclick="openQuestionsModal()">
+                        <i class="fas fa-edit"></i> Edit Questions
+                    </button>
+                </div>
+                
+                <div class="file-preview hidden" id="filePreview">
+                    <div class="file-info">
+                        <i class="fas fa-file-audio"></i>
+                        <div class="file-details">
+                            <span class="file-name" id="fileName">filename.wav</span>
+                            <span class="file-size" id="fileSize">2.5 MB</span>
+                        </div>
+                        <button class="btn btn-icon" id="removeFile">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <audio id="audioPlayer" controls></audio>
+                    <button class="btn btn-primary btn-large" id="processBtn">
+                        <i class="fas fa-play"></i> Start Processing
+                    </button>
+                </div>
+            </section>
+
+            <!-- Progress Section -->
+            <section class="progress-section hidden" id="progressSection">
+                <div class="progress-card">
+                    <div class="progress-header">
+                        <h3>Processing Audio</h3>
+                        <span class="progress-percent" id="progressPercent">0%</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <p class="progress-message" id="progressMessage">Uploading file...</p>
+                    <div class="processing-steps">
+                        <div class="step" id="step1">
+                            <i class="fas fa-upload"></i>
+                            <span>Upload</span>
+                        </div>
+                        <div class="step" id="step2">
+                            <i class="fas fa-users"></i>
+                            <span>Diarization</span>
+                        </div>
+                        <div class="step" id="step3">
+                            <i class="fas fa-microphone"></i>
+                            <span>Transcription</span>
+                        </div>
+                        <div class="step" id="step4">
+                            <i class="fas fa-brain"></i>
+                            <span>Summary</span>
+                        </div>
+                        <div class="step" id="step5">
+                            <i class="fas fa-clipboard-check"></i>
+                            <span>Evaluation</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section class="results-section hidden" id="resultsSection">
+                
+                <!-- Quality Score Card -->
+                <div class="result-card score-card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-star"></i> Call Quality Score</h3>
+                    </div>
+                    <div class="card-content">
+                        <div class="score-overview" id="scoreOverview"></div>
+                    </div>
+                </div>
+
+                <!-- Question Evaluation Card -->
+                <div class="result-card evaluation-card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-clipboard-check"></i> Quality Checklist</h3>
+                        <div class="header-actions">
+                            <button class="btn btn-secondary btn-sm" onclick="toggleAllCategories()">
+                                <i class="fas fa-expand-alt"></i> Expand All
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-content">
+                        <div class="evaluation-categories" id="evaluationCategories"></div>
+                    </div>
+                </div>
+
+                <!-- Summary Card -->
+                <div class="result-card summary-card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-lightbulb"></i> Call Summary</h3>
+                        <button class="btn btn-icon" onclick="copyToClipboard('summaryContent')">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                    <div class="card-content" id="summaryContent"></div>
+                </div>
+
+                <!-- Speaker Stats -->
+                <div class="result-card stats-card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-chart-pie"></i> Speaker Statistics</h3>
+                    </div>
+                    <div class="card-content">
+                        <div class="speaker-stats" id="speakerStats"></div>
+                    </div>
+                </div>
+
+                <!-- Transcript Card -->
+                <div class="result-card transcript-card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-file-lines"></i> Full Transcript</h3>
+                        <div class="header-actions">
+                            <button class="btn btn-secondary" onclick="downloadTranscript()">
+                                <i class="fas fa-download"></i> Download
+                            </button>
+                            <button class="btn btn-icon" onclick="copyToClipboard('transcriptContent')">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-content">
+                        <div class="transcript-audio hidden" id="transcriptAudioContainer">
+                            <div class="transcript-audio-info">
+                                <div class="audio-icon">
+                                    <i class="fas fa-volume-up"></i>
+                                </div>
+                                <div>
+                                    <div class="audio-label">Call Audio</div>
+                                    <div class="audio-filename" id="transcriptAudioFilename"></div>
+                                </div>
+                            </div>
+                            <audio id="transcriptAudioPlayer" controls></audio>
+                            <button class="btn btn-secondary btn-sm" id="transcriptAudioDownloadBtn">
+                                <i class="fas fa-download"></i> Download Audio
+                            </button>
+                        </div>
+                        <div class="transcript-content" id="transcriptContent"></div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="action-buttons">
+                    <button class="btn btn-secondary" onclick="resetApp()">
+                        <i class="fas fa-redo"></i> Process Another
+                    </button>
+                    <button class="btn btn-primary" onclick="downloadAll()">
+                        <i class="fas fa-download"></i> Download Report
+                    </button>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Powered by Whisper, Pyannote & LangChain</p>
+        </footer>
+    </div>
+
+    <!-- Questions Management Modal -->
+    <div class="modal-overlay hidden" id="questionsModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2><i class="fas fa-clipboard-list"></i> Manage Evaluation Questions</h2>
+                <button class="btn btn-icon" onclick="closeQuestionsModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="modal-tabs">
+                <button class="tab-btn active" onclick="switchTab('questions')">
+                    <i class="fas fa-question-circle"></i> Questions
+                </button>
+                <button class="tab-btn" onclick="switchTab('categories')">
+                    <i class="fas fa-folder"></i> Categories
+                </button>
+                <button class="tab-btn" onclick="switchTab('import')">
+                    <i class="fas fa-file-import"></i> Import/Export
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <!-- Questions Tab -->
+                <div class="tab-content active" id="questionsTab">
+                    <div class="tab-header">
+                        <div class="search-box">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="questionSearch" placeholder="Search questions..." oninput="filterQuestions()">
+                        </div>
+                        <div class="tab-actions">
+                            <select id="categoryFilter" onchange="filterQuestions()">
+                                <option value="">All Categories</option>
+                            </select>
+                            <button class="btn btn-primary btn-sm" onclick="openAddQuestionForm()">
+                                <i class="fas fa-plus"></i> Add Question
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Add/Edit Question Form -->
+                    <div class="question-form hidden" id="questionForm">
+                        <h4 id="formTitle">Add New Question</h4>
+                        <input type="hidden" id="editQuestionId">
+                        
+                        <div class="form-group">
+                            <label>Question ID <span class="required">*</span></label>
+                            <input type="text" id="questionId" placeholder="e.g., greeting_check">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Question <span class="required">*</span></label>
+                            <input type="text" id="questionText" placeholder="e.g., Did the agent greet the customer?">
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Category</label>
+                                <select id="questionCategory"></select>
+                            </div>
+                            <div class="form-group">
+                                <label>Weight (1-5)</label>
+                                <input type="number" id="questionWeight" min="1" max="5" value="3">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Description / Context for AI</label>
+                            <textarea id="questionDescription" placeholder="Provide additional context to help the AI evaluate this question..."></textarea>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button class="btn btn-secondary" onclick="cancelQuestionForm()">Cancel</button>
+                            <button class="btn btn-primary" onclick="saveQuestion()">
+                                <i class="fas fa-save"></i> Save Question
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Questions List -->
+                    <div class="questions-list" id="questionsList"></div>
+                    
+                    <div class="modal-footer-actions">
+                        <button class="btn btn-danger btn-sm" onclick="resetToDefaults()">
+                            <i class="fas fa-undo"></i> Reset to Defaults
+                        </button>
+                        <span class="question-count" id="questionCount">0 questions</span>
+                    </div>
+                </div>
+                
+                <!-- Categories Tab -->
+                <div class="tab-content" id="categoriesTab">
+                    <div class="tab-header">
+                        <h4>Manage Categories</h4>
+                        <button class="btn btn-primary btn-sm" onclick="openAddCategoryForm()">
+                            <i class="fas fa-plus"></i> Add Category
+                        </button>
+                    </div>
+                    
+                    <!-- Add Category Form -->
+                    <div class="category-form hidden" id="categoryForm">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Category Name <span class="required">*</span></label>
+                                <input type="text" id="categoryName" placeholder="e.g., Customer Service">
+                            </div>
+                            <div class="form-group">
+                                <label>Icon (FontAwesome)</label>
+                                <input type="text" id="categoryIcon" placeholder="fa-headset" value="fa-question">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Description</label>
+                                <input type="text" id="categoryDescription" placeholder="Category description">
+                            </div>
+                            <div class="form-group">
+                                <label>Color</label>
+                                <input type="color" id="categoryColor" value="#6366f1">
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button class="btn btn-secondary" onclick="cancelCategoryForm()">Cancel</button>
+                            <button class="btn btn-primary" onclick="saveCategory()">
+                                <i class="fas fa-save"></i> Save Category
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="categories-list" id="categoriesList"></div>
+                </div>
+                
+                <!-- Import/Export Tab -->
+                <div class="tab-content" id="importTab">
+                    <div class="import-export-section">
+                        <div class="export-section">
+                            <h4><i class="fas fa-file-export"></i> Export Questions</h4>
+                            <p>Download your current questions configuration as a JSON file.</p>
+                            <button class="btn btn-primary" onclick="exportQuestions()">
+                                <i class="fas fa-download"></i> Export JSON
+                            </button>
+                        </div>
+                        
+                        <div class="import-section">
+                            <h4><i class="fas fa-file-import"></i> Import Questions</h4>
+                            <p>Import questions from a JSON file. This will replace all existing questions.</p>
+                            <input type="file" id="importFile" accept=".json" hidden onchange="importQuestions(event)">
+                            <button class="btn btn-secondary" onclick="document.getElementById('importFile').click()">
+                                <i class="fas fa-upload"></i> Import JSON
+                            </button>
+                        </div>
+                        
+                        <div class="template-section">
+                            <h4><i class="fas fa-file-code"></i> JSON Template</h4>
+                            <pre id="jsonTemplate">{
+  "questions": [
+    {
+      "id": "unique_id",
+      "category": "Category Name",
+      "question": "Your question here?",
+      "description": "Context for AI",
+      "weight": 3,
+      "enabled": true
+    }
+  ],
+  "categories": {
+    "Category Name": {
+      "description": "Category description",
+      "icon": "fa-icon-name",
+      "color": "#6366f1"
+    }
+  }
+}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast hidden" id="toast">
+        <i class="fas fa-check-circle"></i>
+        <span id="toastMessage">Success!</span>
+    </div>
+
+    <!-- Confirm Dialog -->
+    <div class="modal-overlay hidden" id="confirmModal">
+        <div class="confirm-dialog">
+            <div class="confirm-icon" id="confirmIcon">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <h3 id="confirmTitle">Confirm Action</h3>
+            <p id="confirmMessage">Are you sure you want to proceed?</p>
+            <div class="confirm-actions">
+                <button class="btn btn-secondary" onclick="closeConfirmModal()">Cancel</button>
+                <button class="btn btn-danger" id="confirmBtn" onclick="confirmAction()">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
